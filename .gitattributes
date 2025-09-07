@@ -1,0 +1,5 @@
+* text=auto eol=lf
+
+# Treat built assets as generated
+dist/* linguist-generated
+

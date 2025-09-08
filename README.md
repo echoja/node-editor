@@ -1,53 +1,52 @@
-# node-editor — React + SVG Demo (Engine Port Ready)
+# node-editor — React + SVG 데모 (Engine Port Ready)
 
-This repository is a minimal, working demo that implements the core concepts of a node-based editor using Pure React (DOM/SVG only). It intentionally maintains a strict engine boundary (Port) so the TypeScript engine can later be swapped with a Rust/wasm core without changing the React renderer and UI.
+이 저장소는 순수 React(DOM/SVG만)로 노드 기반 에디터의 핵심 개념을 구현한 최소한의 데모입니다. 엔진 경계(Port)를 엄격히 유지하여, 현재 TypeScript 엔진을 향후 Rust/wasm 코어로 손쉽게 교체할 수 있도록 설계되어 있습니다.
 
-Goals
-- Demonstrate the editor model and interactions with the simplest stack possible.
-- Keep rendering in React + SVG; make engine math swappable (TS ↔ wasm) via a small Port.
-- Keep the code easy to read and fork for experiments.
+목표(Goals)
+- 단순한 스택으로 에디터 모델/인터랙션을 입증
+- 렌더링은 React+SVG, 수학/측정은 엔진 Port 뒤로 캡슐화(TS ↔ wasm 교체 용이)
+- 읽기 쉽고 실험/포크가 쉬운 코드 유지
 
-Non-Goals
-- Production scalability for huge documents (DOM/SVG has limits).
-- Pixel-perfect text metrics and advanced typography.
-- Comprehensive tools (resize/rotate/booleans, etc.) — this is a foundation.
+비목표(Non-Goals)
+- 초대형 문서의 완전한 운영 성능(DOM/SVG 한계 존재)
+- 픽셀 정밀 텍스트/타이포그래피
+- 모든 도구(리사이즈/회전/패스 등) 완비 — 본 저장소는 토대입니다
 
-What’s Included
-- Frame nodes with children and optional clipping.
-- Rect and Text nodes.
-- Selection outline, drag move, pan/zoom to cursor, simple grid.
-- Inspector to edit X/Y of the selected node.
-- A pure TypeScript engine for hit-testing and world bounds, behind a small Port.
+포함 기능(What’s Included)
+- 자식/클립 옵션이 있는 Frame 노드, Rect/Text 노드
+- 선택 테두리, 드래그 이동, 커서 기준 팬/줌, 그리드
+- 선택 노드의 X/Y를 편집하는 Inspector
+- 작은 Port 뒤의 순수 TS 엔진(hit-test, world bounds)
 
-Quick Start
-- Node: use `.tool-versions` (asdf) or `.nvmrc` (nvm) → Node 20.18.3
-- Install: `npm install`
-- Dev: `npm run dev`
-- Typecheck: `npm run typecheck`
-- Build: `npm run build` then `npm run preview`
+빠른 시작(Quick Start)
+- Node: `.tool-versions` 또는 `.nvmrc` 사용 → Node 20.18.3
+- 설치: `npm install`
+- 개발: `npm run dev`
+- 타입 검사: `npm run typecheck`
+- 빌드: `npm run build` 후 `npm run preview`
 
-Controls
-- Select: Left-click
-- Move: Drag selected node
-- Pan: Alt/Option (or Ctrl/Command) + drag, or Middle mouse drag
-- Zoom: Mouse wheel (zooms to cursor position)
+조작 방법(Controls)
+- 선택: 좌클릭
+- 이동: 선택 후 드래그
+- 팬: Alt/Option(또는 Ctrl/Command) + 드래그, 혹은 휠 버튼 드래그
+- 줌: 마우스 휠(커서 기준 줌)
 
-Repository Layout
-- `src/types.ts` — Document, nodes, and camera types (Frame includes `children`, `clipsContent`).
-- `src/engine/port.ts` — Engine Port interface (`hitTest`, `worldRectOf`).
-- `src/engine/pure.ts` — Pure TS engine (math only; no DOM/Canvas).
-- `src/store.ts` — Zustand state: `doc`, `camera`, `selection`, actions.
-- `src/components/SvgScene.tsx` — Renders Doc to SVG (clipPath for frames).
-- `src/components/Viewport.tsx` — SVG viewport: pan/zoom/select/move, selection outline.
-- `src/App.tsx`, `src/main.tsx`, `index.html` — App scaffolding.
-- Meta: `.tool-versions`, `.nvmrc`, `.editorconfig`, `.gitattributes`, `.gitignore`.
+리포지터리 구조(Repository Layout)
+- `src/types.ts` — 문서/노드/카메라 타입(Frame은 `children`, `clipsContent` 포함)
+- `src/engine/port.ts` — 엔진 Port 인터페이스(`hitTest`, `worldRectOf`)
+- `src/engine/pure.ts` — 순수 TS 엔진(수학만; DOM/Canvas 미사용)
+- `src/store.ts` — Zustand 상태: `doc`, `camera`, `selection`, actions
+- `src/components/SvgScene.tsx` — Doc → SVG 렌더러(Frame clipPath 포함)
+- `src/components/Viewport.tsx` — 팬/줌/선택/이동, 선택 테두리
+- `src/App.tsx`, `src/main.tsx`, `index.html` — 앱 스캐폴딩
+- 메타: `.tool-versions`, `.nvmrc`, `.editorconfig`, `.gitattributes`, `.gitignore`
 
-Data Model
-- Coordinates: each node’s `x/y` are parent-local. `FrameNode` and `RectNode` carry `w/h`.
-- Root: an invisible world frame that contains top-level nodes.
-- Types: `FrameNode | RectNode | TextNode`.
+데이터 모델(Data Model)
+- 좌표: 각 노드의 `x/y`는 부모 기준. `FrameNode`/`RectNode`는 `w/h` 보유
+- 루트: 최상위 노드를 담는 보이지 않는 월드 프레임
+- 타입: `FrameNode | RectNode | TextNode`
 
-Example Document
+예시 문서(Example)
 ```json
 {
   "version": 1,
@@ -61,62 +60,60 @@ Example Document
 }
 ```
 
-Engine Port
+엔진 포트(Engine Port)
 ```ts
 export interface EnginePort {
   hitTest(doc: Doc, camera: Camera, screenPt: { x: number; y: number }): Hit | null;
   worldRectOf(doc: Doc, id: NodeID): { x: number; y: number; w: number; h: number };
 }
 ```
-- The React/SVG layer calls this Port only. Today it binds to `pureEngine` (TypeScript).
-- A Rust/wasm core can expose the same API (via wasm-bindgen or cbindgen + glue) to swap in.
+- React/SVG 계층은 이 Port만 호출합니다(현재 `pureEngine` 바인딩).
+- wasm 코어는 동일 API를 노출하여 교체(예: wasm-bindgen + 얇은 glue).
 
-Coordinate Spaces
-- Parent-local: node’s `x/y` are relative to its parent.
-- World: accumulated parent `x/y` up the tree.
-- Screen: world transformed by camera.
-- In code, `world → screen` is applied at the top SVG group: `translate(-camera.x, -camera.y) scale(camera.scale)`.
-- Helper: `screenToWorld(p) = { x: p.x / scale + x, y: p.y / scale + y }`.
+좌표계(Coordinate Spaces)
+- Parent-local: 부모 기준 `x/y`
+- World: 조상들의 `x/y` 누적 값
+- Screen: camera를 적용한 화면 좌표
+- 구현: 최상위 SVG 그룹에 `translate(-camera.x, -camera.y) scale(camera.scale)` 적용
+- `screenToWorld(p) = { x: p.x / scale + x, y: p.y / scale + y }`
 
-Hit-Testing Rule
-- Frames test children first in reverse order (topmost-first).
-- If `clipsContent` is true, only count hits when inside the frame bounds.
-- Otherwise, click-through to children is allowed even when outside the frame rect.
+히트 테스트 규칙(Hit-Testing Rule)
+- Frame은 자식을 역순(최상위부터)으로 우선 검사
+- `clipsContent`가 true면 프레임 내부에서만 히트 인정
+- 아니면 프레임 밖이라도 자식 히트를 허용(클릭 스루)
 
-State Flow
-- Pointer events are attached to the `<svg>` element in `Viewport`.
-- On down: decide `pan` vs `move` based on modifiers; call `engine.hitTest` for selection.
-- On move: update camera or recompute node `x/y` using `screenToWorld` and ancestor offset.
-- On wheel: exponential zoom, anchored to cursor to keep focus stable.
-- Selection outline uses `engine.worldRectOf` and `vectorEffect="non-scaling-stroke"` so it stays 1px on screen.
+상태/이벤트 흐름(State Flow)
+- 포인터 이벤트는 `Viewport`의 `<svg>`에 바인딩
+- down: 보조키로 `pan`/`move` 결정, `engine.hitTest`로 선택
+- move: `screenToWorld` + 조상 오프셋으로 카메라/노드 위치 갱신
+- wheel: 지수 줌, 커서 고정점 유지
+- 선택 테두리: `engine.worldRectOf` + `vectorEffect="non-scaling-stroke"`(항상 화면상 1px)
 
-Why “DOM/SVG only” first?
-- Accelerates iteration for UX and data model without Canvas/WebGL boilerplate.
-- Keeps wasm surface tight — swap just math (hit-test, bounds, layout) later.
-- SVG is good enough for MVPs and moderate node counts.
+왜 DOM/SVG부터?
+- Canvas/WebGL 보일러플레이트 없이 UX/데이터 모델 반복 속도↑
+- wasm 표면을 작게 유지 — 수학(히트/바운즈/레이아웃)만 교체
+- 중간 규모 문서의 MVP에 충분
 
-Limitations
-- Single-item selection in the current UI flow (store supports arrays; UI uses first).
-- Approximate text width for hit-tests and bounds (can be swapped for DOM measure or wasm shaping later).
-- Large documents will need virtualization or off-main-thread work.
+제한사항(Limitations)
+- 현재 UI는 단일 항목 선택(스토어는 배열 지원)
+- 텍스트 폭은 근사치(향후 DOM 측정 또는 wasm shaping로 대체 가능)
+- 대형 문서는 가상화/별도 레이어/워커가 필요
 
-Roadmap (suggested)
-1. Resize handles and transform tools
-2. Undo/redo (command pattern + hotkeys)
-3. Save/load (JSON schema with version)
-4. Layers panel (reorder children → z-order)
-5. Text measurement accuracy (SVG metrics or wasm shaping)
-6. Performance for large docs (virtualization, overlay layers)
+로드맵(Roadmap)
+1. 리사이즈 핸들/변형 도구
+2. Undo/Redo(커맨드 패턴 + 단축키)
+3. JSON 저장/불러오기(버전 포함)
+4. 레이어 패널(자식 순서→z-order)
+5. 텍스트 측정 정밀도(svg 측정 또는 wasm shaping)
+6. 성능(가상 스크롤, 오버레이 레이어)
 
-Project Conventions
-- 2-space indentation (`.editorconfig`)
-- LF line endings (`.gitattributes`)
-- Keep `package-lock.json` committed; ESLint/Prettier intentionally omitted
+프로젝트 규칙(Conventions)
+- 2스페이스 들여쓰기(`.editorconfig`), LF 줄바꿈(`.gitattributes`)
+- `package-lock.json` 커밋 유지, ESLint/Prettier는 의도적으로 미사용
 
-Troubleshooting
-- Middle mouse pan on Mac: use Alt/Option (or Ctrl/Command) + drag.
-- Trackpad zoom direction feels inverted: swap at the OS level or invert the wheel delta in `Viewport`.
+문제 해결(Troubleshooting)
+- Mac에서 중클릭 팬: Alt/Option(또는 Ctrl/Command) + 드래그 사용
+- 트랙패드 줌 방향이 어색할 때: OS 설정 변경 또는 `Viewport`의 휠 델타 부호 반전
 
-Acknowledgements
-- Built with Vite + React + TypeScript and Zustand.
-
+감사의 말(Acknowledgements)
+- Vite + React + TypeScript, Zustand로 구축

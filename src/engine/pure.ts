@@ -1,4 +1,4 @@
-import type { Camera, Doc, Node, NodeID, FrameNode, RectNode, TextNode } from "../types";
+import type { Camera, Doc, Node, NodeID, FrameNode, TextNode } from "../types";
 import type { EnginePort, Hit } from "./port";
 
 function screenToWorld(camera: Camera, p: { x: number; y: number }) {
@@ -13,10 +13,10 @@ function approxTextWidth(n: TextNode): number {
 
 function worldOf(doc: Doc, id: NodeID): { x: number; y: number } {
   let x = 0, y = 0;
-  let cur: Node | null = (doc.nodes[id] as Node | undefined) ?? null;
+  let cur: Node | null = doc.nodes[id] ?? null;
   while (cur) {
     x += cur.x; y += cur.y;
-    cur = cur.parentId ? ((doc.nodes[cur.parentId] as Node | undefined) ?? null) : null;
+    cur = cur.parentId ? (doc.nodes[cur.parentId] ?? null) : null;
   }
   return { x, y };
 }
@@ -31,33 +31,35 @@ function hitNode(doc: Doc, node: Node, worldPt: { x: number; y: number }): NodeI
   const ly = worldPt.y - pos.y;
 
   if (node.type === "frame") {
-    const f = node as FrameNode;
-    const inside = pointInRect(lx, ly, 0, 0, f.w, f.h);
+    const inside = pointInRect(lx, ly, 0, 0, node.w, node.h);
     // children 우선, topmost부터
-    if (!f.clipsContent || inside) {
-      for (let i = f.children.length - 1; i >= 0; i--) {
-        const child = doc.nodes[f.children[i]!];
+    if (!node.clipsContent || inside) {
+      for (let i = node.children.length - 1; i >= 0; i--) {
+        const child = doc.nodes[node.children[i]!];
         if (!child) continue;
         const hit = hitNode(doc, child, worldPt);
         if (hit) return hit;
       }
     }
-    return inside ? f.id : null;
-  } else if (node.type === "rect") {
-    const r = node as RectNode;
-    return pointInRect(lx, ly, 0, 0, r.w, r.h) ? r.id : null;
-  } else {
-    const t = node as TextNode;
-    const w = approxTextWidth(t);
-    const h = t.fontSize ?? 16;
-    return pointInRect(lx, ly, 0, 0, w, h) ? t.id : null;
+    return inside ? node.id : null;
   }
+  if (node.type === "rect") {
+    return pointInRect(lx, ly, 0, 0, node.w, node.h) ? node.id : null;
+  }
+  // text
+  if (node.type === "text") {
+    const w = approxTextWidth(node);
+    const h = node.fontSize ?? 16;
+    return pointInRect(lx, ly, 0, 0, w, h) ? node.id : null;
+  }
+  return null;
 }
 
 export const pureEngine: EnginePort = {
   hitTest(doc, camera, screenPt): Hit | null {
     const world = screenToWorld(camera, screenPt);
-    const root = doc.nodes[doc.rootId] as FrameNode;
+    const root = doc.nodes[doc.rootId];
+    if (!root || root.type !== "frame") return null;
     // 루트는 그리지 않고 자식만 대상
     for (let i = root.children.length - 1; i >= 0; i--) {
       const n = doc.nodes[root.children[i]!];
@@ -76,15 +78,13 @@ export const pureEngine: EnginePort = {
     const pos = worldOf(doc, id);
     if (!n) return { x: pos.x, y: pos.y, w: 0, h: 0 };
     if (n.type === "text") {
-      const t = n as TextNode;
-      const w = approxTextWidth(t);
-      const h = t.fontSize ?? 16;
+      const w = approxTextWidth(n);
+      const h = n.fontSize ?? 16;
       return { x: pos.x, y: pos.y, w, h };
-    } else if (n.type === "rect" || n.type === "frame") {
-      const s = n as any;
-      return { x: pos.x, y: pos.y, w: s.w, h: s.h };
-    } else {
-      return { x: pos.x, y: pos.y, w: 0, h: 0 };
     }
+    if (n.type === "rect" || n.type === "frame") {
+      return { x: pos.x, y: pos.y, w: n.w, h: n.h };
+    }
+    return { x: pos.x, y: pos.y, w: 0, h: 0 };
   }
 };

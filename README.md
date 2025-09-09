@@ -1,23 +1,23 @@
-# node-editor — React + SVG 데모 (Engine Port Ready)
+# node-editor — React DOM 데모 (Engine Port Ready)
 
-이 저장소는 순수 React(DOM/SVG만)로 노드 기반 에디터의 핵심 개념을 구현한 최소한의 데모입니다. 엔진 경계(Port)를 엄격히 유지하여, 현재 TypeScript 엔진을 향후 Rust/wasm 코어로 손쉽게 교체할 수 있도록 설계되어 있습니다.
+이 저장소는 순수 React로 노드 기반 에디터의 핵심 개념을 구현한 최소한의 데모입니다. 엔진 경계(Port)를 엄격히 유지하여, 현재 TypeScript 엔진을 향후 Rust/wasm 코어로 손쉽게 교체할 수 있도록 설계되어 있습니다.
 
 ## 목표
 
 - 단순한 스택으로 에디터 모델/인터랙션을 입증
-- 렌더링은 React+SVG, 수학/측정은 엔진 Port 뒤로 캡슐화(TS ↔ wasm 교체 용이)
+- 렌더링은 React+DOM(div 등), 수학/측정은 엔진 Port 뒤로 캡슐화(TS ↔ wasm 교체 용이)
 - 읽기 쉽고 실험/포크가 쉬운 코드 유지
 
 ## 목표가 아닌 것
 
-- 초대형 문서의 완전한 운영 성능(DOM/SVG 한계 존재)
+- 초대형 문서의 완전한 운영 성능(DOM 한계 존재)
 - 픽셀 정밀 텍스트/타이포그래피
 - 모든 도구(리사이즈/회전/패스 등) 완비
 
 ## 포함된 기능
 
 - 자식/클립 옵션이 있는 Frame 노드, Rect/Text 노드
-- 선택 테두리, 드래그 이동, 커서 기준 팬/줌, 그리드
+- 선택 테두리(화면 고정 1px), 드래그 이동, 커서 기준 팬/줌, CSS 그리드 배경
 - 선택 노드의 X/Y를 편집하는 Inspector
 - 작은 Port 뒤의 순수 TS 엔진(hit-test, world bounds)
 
@@ -42,8 +42,8 @@
 - `src/engine/port.ts` — 엔진 Port 인터페이스(`hitTest`, `worldRectOf`)
 - `src/engine/pure.ts` — 순수 TS 엔진(수학만; DOM/Canvas 미사용)
 - `src/store.ts` — Zustand 상태: `doc`, `camera`, `selection`, actions
-- `src/components/SvgScene.tsx` — Doc → SVG 렌더러(Frame clipPath 포함)
-- `src/components/Viewport.tsx` — 팬/줌/선택/이동, 선택 테두리
+- `src/components/DivScene.tsx` — Doc → DOM 렌더러(absolute 레이아웃, overflow:hidden으로 clip)
+- `src/components/Viewport.tsx` — 팬/줌/선택/이동, 선택 테두리 오버레이
 - `src/App.tsx`, `src/main.tsx`, `index.html` — 앱 스캐폴딩
 - 메타: `.tool-versions`, `.nvmrc`, `.editorconfig`, `.gitattributes`, `.gitignore`
 
@@ -121,7 +121,7 @@ export interface EnginePort {
 }
 ```
 
-- React/SVG 계층은 이 Port만 호출합니다(현재 `pureEngine` 바인딩).
+- React/DOM 계층은 이 Port만 호출합니다(현재 `pureEngine` 바인딩).
 - wasm 코어는 동일 API를 노출하여 교체(예: wasm-bindgen + 얇은 glue).
 
 ## 좌표계
@@ -129,7 +129,7 @@ export interface EnginePort {
 - Parent-local: 부모 기준 `x/y`
 - World: 조상들의 `x/y` 누적 값
 - Screen: camera를 적용한 화면 좌표
-- 구현: 최상위 SVG 그룹에 `translate(-camera.x, -camera.y) scale(camera.scale)` 적용
+- 구현: 월드 컨테이너 div에 CSS `transform: translate(-camera.x, -camera.y) scale(camera.scale)` 적용
 - `screenToWorld(p) = { x: p.x / scale + x, y: p.y / scale + y }`
 
 ## 히트 테스트 규칙
@@ -140,13 +140,13 @@ export interface EnginePort {
 
 ## 상태/이벤트 흐름
 
-- 포인터 이벤트는 `Viewport`의 `<svg>`에 바인딩
+- 포인터 이벤트는 `Viewport`의 루트 div에 바인딩
 - down: 보조키로 `pan`/`move` 결정, `engine.hitTest`로 선택
 - move: `screenToWorld` + 조상 오프셋으로 카메라/노드 위치 갱신
 - wheel: 지수 줌, 커서 고정점 유지
-- 선택 테두리: `engine.worldRectOf` + `vectorEffect="non-scaling-stroke"`(항상 화면상 1px)
+- 선택 테두리: `engine.worldRectOf` → 화면 좌표로 변환 후 div에 1px dashed border
 
-## 왜 DOM/SVG부터?
+## 왜 DOM부터?
 
 - Canvas/WebGL 보일러플레이트 없이 UX/데이터 모델 반복 속도↑
 - wasm 표면을 작게 유지 — 수학(히트/바운즈/레이아웃)만 교체
@@ -157,6 +157,10 @@ export interface EnginePort {
 - 현재 UI는 단일 항목 선택(스토어는 배열 지원)
 - 텍스트 폭은 근사치(향후 DOM 측정 또는 wasm shaping로 대체 가능)
 - 대형 문서는 가상화/별도 레이어/워커가 필요
+
+## 타입 단언 최소화
+
+- 전반적으로 `as Type` 사용을 줄였습니다. 유니언 타입은 `type` 식별자(Discriminated Union)로 분기해 협소화하며, 초기 상태는 명시 타입 변수(`FrameNode`, `RectNode`, `TextNode`)를 별도로 선언해 `as`를 제거했습니다.
 
 ## 로드맵
 

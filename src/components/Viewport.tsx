@@ -1,12 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useEditor } from "../store";
 import { pureEngine } from "../engine/pure";
 import type { EnginePort } from "../engine/port";
 import { DivScene } from "./DivScene";
-import { SelectionOverlay } from "./SelectionOverlay";
 import { ViewportGrid } from "./ViewportGrid";
-import { ZoomControls } from "./ZoomControls";
-import { DebugOverlay } from "./DebugOverlay";
 import { screenToWorld, worldOfAncestors } from "./coords";
 import type { Doc, NodeID, Camera } from "../types";
 
@@ -199,6 +202,7 @@ export const Viewport: React.FC = () => {
 
   return (
     <div
+      className="root"
       ref={rootRef}
       style={{
         position: "relative",
@@ -219,11 +223,6 @@ export const Viewport: React.FC = () => {
         <ViewportGrid />
         <DivScene doc={doc} />
       </div>
-      {/* 선택 박스 오버레이 (화면 고정 레이어) */}
-      <SelectionOverlay doc={doc} camera={camera} selection={selection} engine={engine} />
-      {/* 줌 버튼 오버레이 */}
-      <ZoomControls onZoomIn={() => zoomAt(1.2)} onZoomOut={() => zoomAt(1 / 1.2)} onReset={() => setCamera({ scale: 1 })} />
-      <DebugOverlay camera={camera} />
     </div>
   );
 };

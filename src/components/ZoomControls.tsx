@@ -1,12 +1,22 @@
 import React from "react";
+import { useEditor } from "../store";
 
-type Props = {
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  onReset?: () => void;
-};
+export const ZoomControls: React.FC = () => {
+  const { setCamera } = useEditor((s) => s.actions);
+  const camera = useEditor((s) => s.camera);
 
-export const ZoomControls: React.FC<Props> = ({ onZoomIn, onZoomOut, onReset }) => {
+  const onZoomIn = () => {
+    setCamera({ scale: camera.scale * 1.2 });
+  };
+
+  const onZoomOut = () => {
+    setCamera({ scale: camera.scale / 1.2 });
+  };
+
+  const onReset = () => {
+    setCamera({ scale: 1 });
+  };
+
   const wrap: React.CSSProperties = {
     position: "absolute",
     right: 8,
@@ -18,6 +28,7 @@ export const ZoomControls: React.FC<Props> = ({ onZoomIn, onZoomOut, onReset }) 
     borderRadius: 6,
     padding: 6,
     boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+    pointerEvents: "auto"
   };
   const btn: React.CSSProperties = {
     appearance: "none",
@@ -30,10 +41,17 @@ export const ZoomControls: React.FC<Props> = ({ onZoomIn, onZoomOut, onReset }) 
   };
   return (
     <div style={wrap}>
-      <button style={btn} onClick={onZoomOut} aria-label="Zoom Out">-</button>
-      <button style={btn} onClick={onZoomIn} aria-label="Zoom In">+</button>
-      {onReset ? <button style={btn} onClick={onReset} aria-label="Reset Zoom">100%</button> : null}
+      <button style={btn} onClick={onZoomOut} aria-label="Zoom Out">
+        -
+      </button>
+      <button style={btn} onClick={onZoomIn} aria-label="Zoom In">
+        +
+      </button>
+      {onReset ? (
+        <button style={btn} onClick={onReset} aria-label="Reset Zoom">
+          100%
+        </button>
+      ) : null}
     </div>
   );
 };
-

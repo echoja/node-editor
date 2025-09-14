@@ -1,6 +1,11 @@
 import React from "react";
 import { Viewport } from "./components/Viewport";
 import { useEditor } from "./store";
+import { SelectionOverlay } from "./components/SelectionOverlay";
+import { ResizeHandlesOverlay } from "./components/ResizeHandlesOverlay";
+import { ZoomControls } from "./components/ZoomControls";
+import { DebugOverlay } from "./components/DebugOverlay";
+import { OverlayGroup } from "./components/OverlayGroup";
 
 const Inspector: React.FC = () => {
   const selection = useEditor(s => s.selection);
@@ -22,7 +27,10 @@ export default function App() {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "56px 1fr 260px", height: "100vh" }}>
       <aside style={{ borderRight: "1px solid #eee", padding: 8 }}>툴바</aside>
-      <main><Viewport /></main>
+      <main style={{ position: "relative", }}>
+        <Viewport />
+        <OverlayGroup />
+      </main>
       <aside style={{ borderLeft: "1px solid #eee" }}><Inspector /></aside>
     </div>
   );

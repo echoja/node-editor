@@ -1,6 +1,7 @@
 import React from "react";
 import type { Camera, Doc, NodeID } from "../types";
 import type { EnginePort } from "../engine/port";
+import { screenRectOf } from "../utils/overlay";
 
 type Props = {
   doc: Doc;
@@ -12,21 +13,16 @@ type Props = {
 export const SelectionOverlay: React.FC<Props> = React.memo(({ doc, camera, selection, engine }) => {
   if (selection.length !== 1) return null;
   const id = selection[0]!;
-  const r = engine.worldRectOf(doc, id);
-  const sx = (r.x - camera.x) * camera.scale;
-  const sy = (r.y - camera.y) * camera.scale;
-  const sw = r.w * camera.scale;
-  const sh = r.h * camera.scale;
+  const { x: sx, y: sy, w: sw, h: sh } = screenRectOf(engine, doc, camera, id);
   const style: React.CSSProperties = {
     position: "absolute",
-    left: Math.round(sx),
-    top: Math.round(sy),
-    width: Math.max(0, Math.round(sw)),
-    height: Math.max(0, Math.round(sh)),
+    left: sx,
+    top: sy,
+    width: sw,
+    height: sh,
     border: "1px dashed #3b82f6",
     pointerEvents: "none",
     boxSizing: "border-box",
   };
   return <div style={style} />;
 });
-

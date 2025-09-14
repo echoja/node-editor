@@ -8,6 +8,8 @@ export type BaseNode = {
   name?: string;
   x: number; // parent-local
   y: number; // parent-local
+  // position model: default 'absolute' for current nodes
+  position?: "absolute" | "relative";
   opacity?: number;
   visible?: boolean;
   locked?: boolean;

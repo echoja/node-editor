@@ -1,16 +1,16 @@
 import React from "react";
 import type { Camera, Doc, NodeID } from "../types";
-import type { EnginePort } from "../engine/port";
 import { screenRectOf } from "../utils/overlay";
+import { useEngine } from "../lib/engineContext";
 
 type Props = {
   doc: Doc;
   camera: Camera;
   selection: NodeID[];
-  engine: EnginePort;
 };
 
-export const SelectionOverlay: React.FC<Props> = React.memo(({ doc, camera, selection, engine }) => {
+export const SelectionOverlay: React.FC<Props> = React.memo(({ doc, camera, selection }) => {
+  const engine = useEngine();
   if (selection.length !== 1) return null;
   const id = selection[0]!;
   const { x: sx, y: sy, w: sw, h: sh } = screenRectOf(engine, doc, camera, id);

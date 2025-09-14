@@ -1,13 +1,12 @@
 import React from "react";
 import type { Camera, Doc, NodeID } from "../types";
-import type { EnginePort } from "../engine/port";
 import { screenRectOf } from "../utils/overlay";
+import { useEngine } from "../lib/engineContext";
 
 type Props = {
   doc: Doc;
   camera: Camera;
   selection: NodeID[];
-  engine: EnginePort;
   // 추후 사이즈 조정 시작 시그널을 연결할 수 있도록 미리 훅 제공
   onResizeStart?: (id: NodeID, handle: HandleId, e: React.PointerEvent) => void;
 };
@@ -22,7 +21,8 @@ type HandleId =
   | "se"
   | "sw";
 
-export const ResizeHandlesOverlay: React.FC<Props> = ({ doc, camera, selection, engine, onResizeStart }) => {
+export const ResizeHandlesOverlay: React.FC<Props> = ({ doc, camera, selection, onResizeStart }) => {
+  const engine = useEngine();
   if (selection.length !== 1) return null;
   const id = selection[0]!;
   const r = screenRectOf(engine, doc, camera, id);
@@ -67,4 +67,3 @@ export const ResizeHandlesOverlay: React.FC<Props> = ({ doc, camera, selection, 
     </>
   );
 };
-

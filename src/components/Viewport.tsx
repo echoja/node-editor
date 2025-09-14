@@ -6,20 +6,22 @@ import React, {
   useState,
 } from "react";
 import { useEditor } from "../store";
-import { pureEngine } from "../engine/pure";
-import type { EnginePort } from "../engine/port";
+import { useEngine } from "../lib/engineContext";
 import { DivScene } from "./DivScene";
 import { ViewportGrid } from "./ViewportGrid";
 import { screenToWorld, worldOfAncestors } from "./coords";
 import type { Doc, NodeID, Camera } from "../types";
+import { absPreviewWorldRect } from "../lib/drag/preview";
+import { computeHoverIndex, parentOf, isRelative } from "../lib/drag/reorder";
 
 export const Viewport: React.FC = () => {
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const engine: EnginePort = useMemo(() => pureEngine, []);
+  const engine = useEngine();
   const doc = useEditor((s) => s.doc);
   const camera = useEditor((s) => s.camera);
   const selection = useEditor((s) => s.selection);
-  const { setCamera, select, moveNodeTo } = useEditor((s) => s.actions);
+  const { setCamera, select, moveNodeTo, setDrag, clearDrag, reorderRelative } = useEditor((s) => s.actions);
+  const dragStore = useEditor((s) => s.drag);
 
   const drag = useRef<{
     mode: "pan" | "move" | null;
@@ -100,6 +102,11 @@ export const Viewport: React.FC = () => {
         if (hit) {
           select([hit.id]);
           drag.current = { mode: "move", id: hit.id, local: hit.local };
+          const fromWorld = engine.worldRectOf(doc, hit.id);
+          const parent = parentOf(doc, hit.id);
+          const isRel = isRelative(doc, hit.id);
+          const kind = parent && parent.type === "frame" && isRel ? "reorderRel" : "moveAbs";
+          setDrag({ id: hit.id, kind, parentId: parent?.id ?? null, fromWorld, local: hit.local, previewWorld: null, hoverIndex: null, activated: false, startScreen: mouse });
         } else {
           select([]);
           drag.current = { mode: null };
@@ -117,16 +124,45 @@ export const Viewport: React.FC = () => {
         m.last = mouse;
       } else if (m.mode === "move" && m.id && m.local) {
         const w = screenToWorld(mouse, camera);
-        const node = doc.nodes[m.id!];
-        if (!node) return;
-        const parentId = node.parentId;
-        const off = worldOfAncestors(doc, parentId);
-        const nx = Math.round(w.x - off.x - m.local.x);
-        const ny = Math.round(w.y - off.y - m.local.y);
-        moveNodeTo(m.id!, nx, ny);
+        // activate on 1px movement (screen space)
+        if (!dragStore.activated && dragStore.startScreen) {
+          const dx = mouse.x - dragStore.startScreen.x;
+          const dy = mouse.y - dragStore.startScreen.y;
+          if (Math.hypot(dx, dy) >= 1) {
+            setDrag({ activated: true });
+          }
+        }
+        // preview only; don't mutate doc
+        if (dragStore.kind === "moveAbs" && dragStore.fromWorld && dragStore.local) {
+          const preview = absPreviewWorldRect(w, dragStore.fromWorld, dragStore.local);
+          setDrag({ previewWorld: preview });
+        } else if (dragStore.kind === "reorderRel" && dragStore.parentId) {
+          const preview = dragStore.fromWorld && dragStore.local ? absPreviewWorldRect(w, dragStore.fromWorld, dragStore.local) : null;
+          const hover = computeHoverIndex(doc, engine, dragStore.parentId, dragStore.id!, w.y);
+          setDrag({ previewWorld: preview ?? undefined, hoverIndex: hover });
+        }
       }
     }
     function onUp(e: PointerEvent) {
+      const m = drag.current;
+      if (m.mode === "move" && m.id && m.local) {
+        if (dragStore.kind === "moveAbs" && dragStore.fromWorld) {
+          // commit absolute move
+          const mouse = getMouse(e);
+          const w = screenToWorld(mouse, camera);
+          const node = doc.nodes[m.id!];
+          if (node) {
+            const parentId = node.parentId;
+            const off = worldOfAncestors(doc, parentId);
+            const nx = Math.round(w.x - off.x - m.local.x);
+            const ny = Math.round(w.y - off.y - m.local.y);
+            moveNodeTo(m.id!, nx, ny);
+          }
+        } else if (dragStore.kind === "reorderRel" && dragStore.parentId != null && dragStore.hoverIndex != null) {
+          reorderRelative(dragStore.parentId, m.id!, dragStore.hoverIndex);
+        }
+      }
+      clearDrag();
       drag.current = { mode: null };
       el.releasePointerCapture(e.pointerId);
     }
@@ -162,7 +198,7 @@ export const Viewport: React.FC = () => {
       el.removeEventListener("pointerup", onUp);
       el.removeEventListener("wheel", onWheel);
     };
-  }, [doc, camera, engine, setCamera, select, moveNodeTo]);
+  }, [doc, camera, engine, setCamera, select, moveNodeTo, setDrag, clearDrag, reorderRelative, dragStore.kind, dragStore.fromWorld, dragStore.local, dragStore.parentId, dragStore.hoverIndex, dragStore.activated, dragStore.startScreen]);
 
   // 선택 박스는 별도 오버레이 컴포넌트에서 렌더링
 

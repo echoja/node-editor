@@ -170,7 +170,7 @@ export const Viewport: React.FC = () => {
     position: "absolute",
     left: 0,
     top: 0,
-    transform: `translate(${-camera.x}px, ${-camera.y}px) scale(${
+    transform: `translate(${-camera.x * camera.scale}px, ${-camera.y * camera.scale}px) scale(${
       camera.scale
     })`,
     transformOrigin: "0 0",

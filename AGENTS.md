@@ -12,6 +12,8 @@ Minimal React node‑editor demo. DOM‑only rendering; strict Engine Port. A Ru
 
 Prefer small modules. UI → `src/components/`; engine → `src/engine/`. No Canvas/WebGL.
 
+Rule: If a file gets long (≈200+ lines), split it into smaller focused modules.
+
 ## Commands
 - `npm run dev`, `npm run typecheck`, `npm run build`, `npm run preview`
 - Node 20.18.3 (`.tool-versions` / `.nvmrc`)

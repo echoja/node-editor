@@ -12,11 +12,19 @@ function approxTextWidth(n: TextNode): number {
 }
 
 function worldOf(doc: Doc, id: NodeID): { x: number; y: number } {
+  // DOM 절대 위치는 부모의 padding box(= 안쪽 테두리) 기준입니다.
+  // 프레임의 border(stroke)가 있으면 자식의 (0,0)은 border 두께만큼 안쪽으로 이동합니다.
+  // 엔진 좌표도 동일하게 맞추기 위해 각 조상 프레임의 strokeWidth를 누적합니다.
   let x = 0, y = 0;
   let cur: Node | null = doc.nodes[id] ?? null;
   while (cur) {
     x += cur.x; y += cur.y;
-    cur = cur.parentId ? (doc.nodes[cur.parentId] ?? null) : null;
+    const parent: Node | null = cur.parentId ? (doc.nodes[cur.parentId] ?? null) : null;
+    if (parent && parent.type === "frame") {
+      const bw = parent.strokeWidth ?? (parent.stroke ? 1 : 0);
+      if (bw) { x += bw; y += bw; }
+    }
+    cur = parent;
   }
   return { x, y };
 }

@@ -1,40 +1,95 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useEditor } from "../store";
 import { pureEngine } from "../engine/pure";
 import type { EnginePort } from "../engine/port";
 import { DivScene } from "./DivScene";
+import { SelectionOverlay } from "./SelectionOverlay";
+import { ViewportGrid } from "./ViewportGrid";
+import { ZoomControls } from "./ZoomControls";
+import { DebugOverlay } from "./DebugOverlay";
+import { screenToWorld, worldOfAncestors } from "./coords";
 import type { Doc, NodeID, Camera } from "../types";
 
 export const Viewport: React.FC = () => {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const engine: EnginePort = useMemo(() => pureEngine, []);
-  const doc = useEditor(s => s.doc);
-  const camera = useEditor(s => s.camera);
-  const selection = useEditor(s => s.selection);
-  const { setCamera, select, moveNodeTo } = useEditor(s => s.actions);
+  const doc = useEditor((s) => s.doc);
+  const camera = useEditor((s) => s.camera);
+  const selection = useEditor((s) => s.selection);
+  const { setCamera, select, moveNodeTo } = useEditor((s) => s.actions);
 
-  const drag = useRef<{ mode: "pan" | "move" | null; id?: NodeID; local?: { x: number; y: number }; last?: { x: number; y: number } }>({ mode: null });
+  const drag = useRef<{
+    mode: "pan" | "move" | null;
+    id?: NodeID;
+    local?: { x: number; y: number };
+    last?: { x: number; y: number };
+  }>({ mode: null });
+  const [spaceDown, setSpaceDown] = useState(false);
+  const spaceRef = useRef(false);
 
-  function screenToWorld(p: { x: number; y: number }, cam: Camera) {
-    return { x: p.x / cam.scale + cam.x, y: p.y / cam.scale + cam.y };
-  }
   function getMouse(e: PointerEvent | WheelEvent) {
     const r = rootRef.current!.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
-  function worldOfAncestors(d: Doc, parentId: NodeID | null) {
-    let x = 0, y = 0;
-    let cur = parentId ? d.nodes[parentId] : null;
-    while (cur) { x += cur.x; y += cur.y; cur = cur.parentId ? d.nodes[cur.parentId] : null; }
-    return { x, y };
-  }
+
+  useEffect(() => {
+    function isTypingTarget(el: Element | null): boolean {
+      if (!el) return false;
+      const tag = el.tagName;
+      const editable =
+        "isContentEditable" in el && el.isContentEditable === true;
+      return (
+        editable || tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT"
+      );
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      // Space 핸드 툴 (타이핑 중에는 비활성)
+      const isSpace =
+        e.code === "Space" || e.key === " " || e.key === "Spacebar";
+      if (!isSpace) return;
+      if (isTypingTarget(document.activeElement)) return;
+      if (!spaceRef.current) {
+        spaceRef.current = true;
+        setSpaceDown(true);
+      }
+      // 페이지 스크롤 방지
+      e.preventDefault();
+    }
+    function onKeyUp(e: KeyboardEvent) {
+      const isSpace =
+        e.code === "Space" || e.key === " " || e.key === "Spacebar";
+      if (!isSpace) return;
+      spaceRef.current = false;
+      setSpaceDown(false);
+    }
+    function onBlur() {
+      // 창 포커스가 사라지면 상태 정리
+      spaceRef.current = false;
+      setSpaceDown(false);
+    }
+
+    window.addEventListener("keydown", onKeyDown, { passive: false });
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, []);
 
   useEffect(() => {
     const el = rootRef.current!;
     function onDown(e: PointerEvent) {
       el.setPointerCapture(e.pointerId);
       const mouse = getMouse(e);
-      const isPan = e.button === 1 || e.altKey || e.metaKey || e.ctrlKey;
+      const isPan =
+        e.button === 1 ||
+        e.altKey ||
+        e.metaKey ||
+        e.ctrlKey ||
+        (e.button === 0 && spaceRef.current);
       if (isPan) {
         drag.current = { mode: "pan", last: mouse };
       } else {
@@ -73,14 +128,25 @@ export const Viewport: React.FC = () => {
       el.releasePointerCapture(e.pointerId);
     }
     function onWheel(e: WheelEvent) {
+      // 기본: 스크롤로 팬. Cmd(또는 Ctrl)+스크롤일 때만 줌.
       e.preventDefault();
-      const mouse = getMouse(e);
-      const worldBefore = screenToWorld(mouse, camera);
-      const zoom = Math.exp(-e.deltaY * 0.001);
-      const next = Math.min(8, Math.max(0.125, camera.scale * zoom));
-      const tmp = { ...camera, scale: next };
-      const worldAfter = screenToWorld(mouse, tmp);
-      setCamera({ scale: next, x: camera.x + (worldBefore.x - worldAfter.x), y: camera.y + (worldBefore.y - worldAfter.y) });
+      if (e.metaKey || e.ctrlKey) {
+        const mouse = getMouse(e);
+        const worldBefore = screenToWorld(mouse, camera);
+        const zoom = Math.exp(-e.deltaY * 0.001);
+        const next = Math.min(8, Math.max(0.125, camera.scale * zoom));
+        const tmp = { ...camera, scale: next };
+        const worldAfter = screenToWorld(mouse, tmp);
+        setCamera({
+          scale: next,
+          x: camera.x + (worldBefore.x - worldAfter.x),
+          y: camera.y + (worldBefore.y - worldAfter.y),
+        });
+      } else {
+        const dx = e.deltaX / camera.scale;
+        const dy = e.deltaY / camera.scale;
+        setCamera({ x: camera.x + dx, y: camera.y + dy });
+      }
     }
 
     el.addEventListener("pointerdown", onDown);
@@ -95,66 +161,69 @@ export const Viewport: React.FC = () => {
     };
   }, [doc, camera, engine, setCamera, select, moveNodeTo]);
 
-  // 선택 박스: 화면 좌표에서 1px 유지
-  const selectionRect = (() => {
-    if (selection.length !== 1) return null;
-    const id = selection[0]!;
-    const r = engine.worldRectOf(doc, id);
-    const sx = (r.x - camera.x) * camera.scale;
-    const sy = (r.y - camera.y) * camera.scale;
-    const sw = r.w * camera.scale;
-    const sh = r.h * camera.scale;
-    const style: React.CSSProperties = {
-      position: "absolute",
-      left: Math.round(sx),
-      top: Math.round(sy),
-      width: Math.max(0, Math.round(sw)),
-      height: Math.max(0, Math.round(sh)),
-      border: "1px dashed #3b82f6",
-      pointerEvents: "none",
-      boxSizing: "border-box",
-    };
-    return <div style={style} />;
-  })();
+  // 선택 박스는 별도 오버레이 컴포넌트에서 렌더링
 
   const worldStyle: React.CSSProperties = {
     position: "absolute",
     left: 0,
     top: 0,
-    transform: `translate(${-camera.x}px, ${-camera.y}px) scale(${camera.scale})`,
+    transform: `translate(${-camera.x}px, ${-camera.y}px) scale(${
+      camera.scale
+    })`,
     transformOrigin: "0 0",
     willChange: "transform",
   };
 
+  const zoomAt = useCallback(
+    (factor: number) => {
+      const el = rootRef.current;
+      if (!el) {
+        console.error("no root");
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      const mouse = { x: r.width / 2, y: r.height / 2 };
+      const worldBefore = screenToWorld(mouse, camera);
+      const next = Math.min(8, Math.max(0.125, camera.scale * factor));
+      const tmp = { ...camera, scale: next };
+      const worldAfter = screenToWorld(mouse, tmp);
+      console.log("ho1");
+      setCamera({
+        scale: next,
+        x: camera.x + (worldBefore.x - worldAfter.x),
+        y: camera.y + (worldBefore.y - worldAfter.y),
+      });
+    },
+    [camera, setCamera]
+  );
+
   return (
-    <div ref={rootRef} style={{ position: "relative", width: "100%", height: "100%", background: "#fff", overflow: "hidden" }}>
+    <div
+      ref={rootRef}
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        background: "#fff",
+        overflow: "hidden",
+        cursor:
+          drag.current.mode === "pan"
+            ? "grabbing"
+            : spaceDown
+            ? "grab"
+            : "default",
+      }}
+    >
       {/* 월드 레이어 (카메라 변환 적용) */}
       <div style={worldStyle}>
-        <Grid />
+        <ViewportGrid />
         <DivScene doc={doc} />
       </div>
       {/* 선택 박스 오버레이 (화면 고정 레이어) */}
-      {selectionRect}
+      <SelectionOverlay doc={doc} camera={camera} selection={selection} engine={engine} />
+      {/* 줌 버튼 오버레이 */}
+      <ZoomControls onZoomIn={() => zoomAt(1.2)} onZoomOut={() => zoomAt(1 / 1.2)} onReset={() => setCamera({ scale: 1 })} />
+      <DebugOverlay camera={camera} />
     </div>
   );
-};
-
-const Grid: React.FC = () => {
-  // 월드 좌표계 고정 그리드 (줌과 함께 스케일)
-  const step = 50; // world units
-  const span = 20000; // cover a large area
-  const style: React.CSSProperties = {
-    position: "absolute",
-    left: -span / 2,
-    top: -span / 2,
-    width: span,
-    height: span,
-    backgroundImage:
-      `repeating-linear-gradient(0deg, #eee, #eee 1px, transparent 1px, transparent ${step}px),` +
-      `repeating-linear-gradient(90deg, #eee, #eee 1px, transparent 1px, transparent ${step}px)`,
-    backgroundPosition: "0 0, 0 0",
-    backgroundSize: `${step}px ${step}px, ${step}px ${step}px`,
-    pointerEvents: "none",
-  };
-  return <div style={style} />;
 };

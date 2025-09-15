@@ -9,7 +9,7 @@ import { useEditor } from "../store";
 import { useEngine } from "../lib/engineContext";
 import { DivScene } from "./DivScene";
 import { ViewportGrid } from "./ViewportGrid";
-import { screenToWorld, worldOfAncestors } from "./coords";
+import { screenToWorld, worldOfAncestors } from "../lib/coords";
 import type { Doc, NodeID, Camera } from "../types";
 import { absPreviewWorldRect } from "../lib/drag/preview";
 import { computeHoverIndex, parentOf, isRelative } from "../lib/drag/reorder";

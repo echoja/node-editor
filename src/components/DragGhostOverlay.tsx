@@ -4,6 +4,7 @@ import { useEngine } from "../lib/engineContext";
 import { worldToScreenRect } from "../lib/layout";
 import { applyRelativeReorder } from "../lib/drag/reorder";
 import { RELATIVE_GAP } from "../lib/constants";
+import { RectWithId } from "../types";
 
 export const DragGhostOverlay: React.FC = () => {
   const camera = useEditor((s) => s.camera);
@@ -26,14 +27,30 @@ export const DragGhostOverlay: React.FC = () => {
   const from = useMemo(() => {
     return drag.fromWorld ? worldToScreenRect(camera, drag.fromWorld) : null;
   }, [camera, drag.fromWorld]);
+
   const preview = useMemo(() => {
-    console.log("drag.previewWorld", drag.previewWorld)
-    return drag.previewWorld ? worldToScreenRect(camera, drag.previewWorld) : null;
+    console.log("drag.previewWorld", drag.previewWorld);
+    return drag.previewWorld
+      ? worldToScreenRect(camera, drag.previewWorld)
+      : null;
   }, [camera, drag.previewWorld]);
 
-  const siblingsPreview = useMemo(() => {
-    if (drag.kind !== "reorderRel" || !drag.parentId || drag.hoverIndex == null) return [] as Array<{x:number;y:number;w:number;h:number;id:string}>;
-    const nextChildren = applyRelativeReorder(doc, drag.parentId, drag.id!, drag.hoverIndex);
+  const siblingsPreview = useMemo<Array<RectWithId>>(() => {
+    if (
+      drag.kind !== "reorderRel" ||
+      !drag.parentId ||
+      drag.hoverIndex == null
+    ) {
+      return [];
+    }
+
+    const nextChildren = applyRelativeReorder(
+      doc,
+      drag.parentId,
+      drag.id!,
+      drag.hoverIndex
+    );
+
     if (!nextChildren.length) return [];
     // compute vstack positions for relative children with the next order
     const parent = doc.nodes[drag.parentId];
@@ -42,17 +59,24 @@ export const DragGhostOverlay: React.FC = () => {
     const gap = RELATIVE_GAP;
     const pw = engine.worldRectOf(doc, parent.id);
     let accY = pw.y + (bw || 0);
-    const arr: Array<{x:number;y:number;w:number;h:number;id:string}> = [];
+
+    const result: Array<RectWithId> = [];
     for (const cid of nextChildren) {
       const n = doc.nodes[cid]!;
       if ((n as any).position === "relative") {
         const cw = engine.worldRectOf(doc, cid);
-        const rect = { x: pw.x + (bw || 0) + n.x, y: accY, w: cw.w, h: cw.h, id: cid };
-        if (cid !== drag.id) arr.push(rect);
+        const rect = {
+          x: pw.x + (bw || 0) + n.x,
+          y: accY,
+          w: cw.w,
+          h: cw.h,
+          id: cid,
+        };
+        if (cid !== drag.id) result.push(rect);
         accY += cw.h + gap;
       }
     }
-    return arr.map((r) => ({ ...worldToScreenRect(camera, r), id: r.id }));
+    return result.map((r) => ({ ...worldToScreenRect(camera, r), id: r.id }));
   }, [camera, doc, engine, drag.kind, drag.parentId, drag.hoverIndex, drag.id]);
 
   if (!drag.id || !from || !drag.activated) return null;

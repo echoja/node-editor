@@ -44,6 +44,14 @@ export type TextNode = BaseNode & {
 
 export type Node = FrameNode | RectNode | TextNode;
 
+export type RectWithId = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  id: string;
+};
+
 export type Doc = {
   version: 1;
   rootId: NodeID;
